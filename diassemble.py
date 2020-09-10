@@ -79,13 +79,10 @@ def additive_check(instr, byte):
     to that offest if true and None otherwise. 
     '''
     instruction = int.from_bytes(instr, "big")
-    print(instruction)
     opcode = int.from_bytes(byte, "big")
-    print(opcode)
     net = instruction - opcode
-    print(net)
-    if abs(net) < 8 :
-        return parse_register(abs(net))
+    if 0 <= net < 8 :
+        return parse_register(net)
     return None
 
 
@@ -102,7 +99,7 @@ def parse_modrm(byte):
 
 def parse_register(reg):
     '''
-    reg: An integer representing an x86 register
+    reg: An integer representing an x86 register - between 0 and 7
     Returns the register name as a string
     '''
     if reg == 0 :
@@ -121,6 +118,7 @@ def parse_register(reg):
         return 'esi'
     if reg == 7 :
         return 'edi'
+    return None
 
 def rm32immediate(instr, mod, reg, rm, op):
     '''
@@ -137,11 +135,13 @@ def rm32immediate(instr, mod, reg, rm, op):
         if mod == 0 and rm != 5:
             register = parse_register(rm)
             immediate = format_little_endian(instr[2:])
+            log.info('Found {} r/m32, imm32'.format(op))
             return format_instr(instr, op, '[{}]'.format(register), immediate)
 
         if mod == 3 :
             register = parse_register(rm)
             immediate = format_little_endian(instr[2:])
+            log.info('Found {} r/m32, imm32'.format(op))
             return format_instr(instr, op, register, immediate)
             
     #check for instructions with an immediate and an 8 bit displacent
@@ -150,6 +150,7 @@ def rm32immediate(instr, mod, reg, rm, op):
             register = parse_register(rm)
             disp = '0x{:02x}'.format(instr[2])
             immediate = format_little_endian(instr[3:])
+            log.info('Found {} r/m32, imm32'.format(op))
             return format_instr(instr, op, '[{} + {}]'.format(register, disp), immediate)
 
     #now check for longer instructions with a 32 bit displacement
@@ -157,11 +158,13 @@ def rm32immediate(instr, mod, reg, rm, op):
         if mod == 0 and rm == 5 :
             disp = format_little_endian(instr[2:6])
             immediate = format_little_endian(instr[6:10])
+            log.info('Found {} r/m32, imm32'.format(op))
             return format_instr(instr, op, '[{}]'.format(disp), immediate)
         if mod == 2 :
             register = parse_register(rm)
             disp = format_little_endian(instr[2:6])
             immediate = format_little_endian(instr[6:10])
+            log.info('Found {} r/m32, imm32'.format(op))
             return format_instr(instr, op, '[{} + {}]'.format(register, disp), immediate)
     
     return None
@@ -181,11 +184,13 @@ def rm32r32(instr, mod, reg, rm, op) :
         if mod == 0 and rm != 5:
             reg_str = parse_register(reg)
             rm_str = parse_register(rm)
+            log.info('Found {} r/m32, r32'.format(op))
             return format_instr(instr, op, '[{}]'.format(rm_str), reg_str)
 
         if mod == 3 :
             reg_str = parse_register(reg)
             rm_str = parse_register(rm)
+            log.info('Found {} r/m32, r32'.format(op))
             return format_instr(instr, op, rm_str, reg_str)
             
     #check for instructions with an 8 bit displacent
@@ -194,6 +199,7 @@ def rm32r32(instr, mod, reg, rm, op) :
             reg_str = parse_register(reg)
             rm_str = parse_register(rm)
             disp = '0x{:02x}'.format(instr[2])
+            log.info('Found {} r/m32, r32'.format(op))
             return format_instr(instr, op, '[{} + {}]'.format(rm_str, disp), reg_str)
             
     #now check for longer instructions with a 32 bit displacement
@@ -201,11 +207,14 @@ def rm32r32(instr, mod, reg, rm, op) :
         if mod == 0 and rm == 5 :
             disp = format_little_endian(instr[2:6])
             reg_str = parse_register(reg)
+            log.info('Found {} r/m32, r32'.format(op))
             return format_instr(instr, op, '[{}]'.format(disp), reg_str)
+
         if mod == 2 :
             reg_str = parse_register(reg)
             disp = format_little_endian(instr[2:6])
             rm_str = parse_register(rm)
+            log.info('Found {} r/m32, r32'.format(op))
             return format_instr(instr, op, '[{} + {}]'.format(rm_str, disp), reg_str)
 
 def r32rm32(instr, mod, reg, rm, op) :
@@ -223,11 +232,13 @@ def r32rm32(instr, mod, reg, rm, op) :
         if mod == 0 and rm != 5:
             reg_str = parse_register(reg)
             rm_str = parse_register(rm)
+            log.info('Found {} r32, r/m32'.format(op))
             return format_instr(instr, op, reg_str, '[{}]'.format(rm_str))
 
         if mod == 3 :
             reg_str = parse_register(reg)
             rm_str = parse_register(rm)
+            log.info('Found {} r32, r/m32'.format(op))
             return format_instr(instr, op, reg_str, rm_str)
             
     #check for instructions with an 8 bit displacent
@@ -236,6 +247,7 @@ def r32rm32(instr, mod, reg, rm, op) :
             reg_str = parse_register(reg)
             rm_str = parse_register(rm)
             disp = '0x{:02x}'.format(instr[2])
+            log.info('Found {} r32, r/m32'.format(op))
             return format_instr(instr, op, reg_str, '[{} + {}]'.format(rm_str, disp))
             
     #now check for longer instructions with a 32 bit displacement
@@ -243,12 +255,57 @@ def r32rm32(instr, mod, reg, rm, op) :
         if mod == 0 and rm == 5 :
             disp = format_little_endian(instr[2:6])
             reg_str = parse_register(reg)
+            log.info('Found {} r32, r/m32'.format(op))
             return format_instr(instr, op, reg_str, '[{}]'.format(disp))
+
         if mod == 2 :
             reg_str = parse_register(reg)
             disp = format_little_endian(instr[2:6])
             rm_str = parse_register(rm)
+            log.info('Found {} r32, r/m32'.format(op))
             return format_instr(instr, op, reg_str, '[{} + {}]'.format(rm_str, disp))
+
+def rm32(instr, mod, rm, op) :
+    '''
+    instr: A bytearray with the instructions
+    mod: An integer representing the mod bits
+    rm: An interger representing the rm bits
+    op:  A string indicated the instruction/mnemonic (i.e. 'add')
+    This function parses out the different modes for instructions with 
+    format 'pop r/m32'. It returns assembly language strings.
+    '''
+    #first check for shorter instructions with just a register
+    if 2 == len(instr) :
+        if mod == 0 and rm != 5:
+            rm_str = parse_register(rm)
+            log.info('Found {} r/m32'.format(op))
+            return format_instr(instr, op, '[{}]'.format(rm_str))
+
+        if mod == 3 :
+            rm_str = parse_register(rm)
+            log.info('Found {} r/m32'.format(op))
+            return format_instr(instr, op, rm_str)
+            
+    #check for instructions with an 8 bit displacent
+    if 3 == len(instr) :
+        if mod == 1 :
+            rm_str = parse_register(rm)
+            disp = '0x{:02x}'.format(instr[2])
+            log.info('Found {} r/m32'.format(op))
+            return format_instr(instr, op, '[{} + {}]'.format(rm_str, disp))
+            
+    #now check for longer instructions with a 32 bit displacement
+    if 6 == len(instr) :
+        if mod == 0 and rm == 5 :
+            disp = format_little_endian(instr[2:6])
+            log.info('Found {} r/m32'.format(op))
+            return format_instr(instr, op, '[{}]'.format(disp))
+
+        if mod == 2 :
+            disp = format_little_endian(instr[2:6])
+            rm_str = parse_register(rm)
+            log.info('Found {} r/m32'.format(op))
+            return format_instr(instr, op, '[{} + {}]'.format(rm_str, disp))
 
 
 def parse_int3(instr):
@@ -300,14 +357,12 @@ def parse_add(instr):
     if b'\x81' == instr[0:1] and len(instr) > 2:
         mod, reg, rm = parse_modrm(instr[1])
         if reg == 0 :
-            log.info("Found add r/m32, immediate")
             result = rm32immediate(instr, mod, reg, rm, 'add')
             if result :
                 return result
     
     #add r/m32, r32 --- 0x01 /r
     if b'\x01' == instr[0:1] and len(instr) > 1:
-        log.info('Found add r/m32, r32')
         mod, reg, rm = parse_modrm(instr[1])
         result = rm32r32(instr, mod, reg, rm, 'add')
         if result :
@@ -315,7 +370,6 @@ def parse_add(instr):
 
     #add r32, r/m32 --- 0x03 /r
     if b'\x03' == instr[0:1] and len(instr) > 1:
-        log.info('Found add r32, r/m32')
         mod, reg, rm = parse_modrm(instr[1])
         result = r32rm32(instr, mod, reg, rm, 'add')
         if result :
@@ -339,14 +393,12 @@ def parse_and(instr):
     if b'\x81' == instr[0:1] and len(instr) > 2:
         mod, reg, rm = parse_modrm(instr[1])
         if reg == 4 :
-            log.info("Found and r/m32, immediate")
             result = rm32immediate(instr, mod, reg, rm, 'and')
             if result :
                 return result
 
     #and r/m32, r32 --- 0x21 /r
     if b'\x21' == instr[0:1] and len(instr) > 1:
-        log.info('Found and r/m32, r32')
         mod, reg, rm = parse_modrm(instr[1])
         result = rm32r32(instr, mod, reg, rm, 'and')
         if result :
@@ -354,7 +406,6 @@ def parse_and(instr):
 
     #and r32, r/m32 --- 0x23 /r
     if b'\x23' == instr[0:1] and len(instr) > 1:
-        log.info('Found and r32, r/m32')
         mod, reg, rm = parse_modrm(instr[1])
         result = r32rm32(instr, mod, reg, rm, 'and')
         if result :
@@ -370,7 +421,18 @@ def parse_call(instr):
     '''
     #call rel32 --- 0xe8 cd (note, treat cd as id)
 
-    
+    #call r/m32 --- 0xff /2
+    return None
+
+def parse_clflush(instr):
+    '''
+    instr: A bytearray of instructions
+    This function determines if the instruction is cflush
+    and formats a line to be printed.
+    '''
+    #clflush m8 --- 0x0f 0xae /7 note: addressing mode 11 is illegal
+    return None
+
 def parse_cmp(instr):
     '''
     instr: A bytearray of instructions
@@ -387,14 +449,12 @@ def parse_cmp(instr):
     if b'\x81' == instr[0:1] and len(instr) > 2:
         mod, reg, rm = parse_modrm(instr[1])
         if reg == 7 :
-            log.info("Found cmp r/m32, immediate")
             result = rm32immediate(instr, mod, reg, rm, 'cmp')
             if result :
                 return result
     
     #cmp r/m32, r32 --- 0x39 /r
     if b'\x39' == instr[0:1] and len(instr) > 1:
-        log.info('Found cmp r/m32, r32')
         mod, reg, rm = parse_modrm(instr[1])
         result = rm32r32(instr, mod, reg, rm, 'cmp')
         if result :
@@ -402,11 +462,132 @@ def parse_cmp(instr):
 
     #cmp r32, r/m32 --- 0x3b /r
     if b'\x3b' == instr[0:1] and len(instr) > 1:
-        log.info('Found cmp r32, r/m32')
         mod, reg, rm = parse_modrm(instr[1])
         result = r32rm32(instr, mod, reg, rm, 'cmp')
         if result :
             return result
+
+    return None
+
+def parse_dec(instr):
+    '''
+    instr: A bytearray of instructions
+    This function determines if the instruction is dec
+    and formats a line to be printed.
+    '''
+    #dec r/m32 --- 0xff /1
+    if b'\xff' == instr[0:1] and len(instr) > 1:
+        mod, reg, rm = parse_modrm(instr[1])
+        if reg == 1 :
+            result = rm32(instr, mod, rm, 'dec')
+            if result :
+                return result
+
+    #dec r32 --- 0x48 + rd
+    if 1 == len(instr) :
+        register = additive_check(instr[0:1], b'\x48')
+        if register != None :
+            log.info("Found dec r32")
+            return format_instr(instr, 'dec', register)
+
+    return None
+
+def parse_idiv(instr):
+    '''
+    instr: A bytearray of instructions
+    This function determines if the instruction is idiv
+    and formats a line to be printed.
+    '''
+    #idiv r/m32 --- 0xf7 /7
+    if b'\xf7' == instr[0:1] and len(instr) > 1:
+        mod, reg, rm = parse_modrm(instr[1])
+        if reg == 7 :
+            result = rm32(instr, mod, rm, 'idiv')
+            if result :
+                return result
+
+    return None
+
+def parse_imul(instr):
+    '''
+    instr: A bytearray of instructions
+    This function determines if the instruction is imul
+    and formats a line to be printed.
+    '''
+    #imul r/m32 --- 0xf7 /5
+    if b'\xf7' == instr[0:1] and len(instr) > 1:
+        mod, reg, rm = parse_modrm(instr[1])
+        if reg == 5 :
+            result = rm32(instr, mod, rm, 'imul')
+            if result :
+                return result
+
+    #imul r32, r/m32 --- 0x0f 0xaf /r
+
+    #imul r32, r/m32, imm32 --- 0x69 /r id
+
+    return None
+
+def parse_inc(instr):
+    '''
+    instr: A bytearray of instructions
+    This function determines if the instruction is inc
+    and formats a line to be printed.
+    '''
+    #inc r/m32 --- 0xff /0
+    if b'\xff' == instr[0:1] and len(instr) > 1:
+        mod, reg, rm = parse_modrm(instr[1])
+        if reg == 0 :
+            result = rm32(instr, mod, rm, 'inc')
+            if result :
+                return result
+
+    #inc r32, --- 0x40 + rd
+    if 1 == len(instr) :
+        register = additive_check(instr[0:1], b'\x40')
+        if register != None :
+            log.info("Found inc r32")
+            return format_instr(instr, 'inc', register)
+
+    return None
+
+def parse_jmp(instr):
+    '''
+    instr: A bytearray of instructions
+    This function determines if the instruction is jmp
+    and formats a line to be printed.
+    '''
+    #jmp rel8 --- 0xeb cb (note: treat cb as ib)
+
+    #jmp rel32 --- 0xe9 cd (Note: treat cd as id)
+
+    #jmp r/m32 --- 0xff /4 
+
+    return None
+
+def parse_jzjnz(instr):
+    '''
+    instr: A bytearray of instructions
+    This function determines if the instruction is jz/jnz
+    and formats a line to be printed.
+    '''
+    #jz rel8 --- 0x74 cb (note: treat cb as ib)
+
+    #jz rel32 --- 0x0f 0x84 cd cd (Note: treat cd as id)
+
+    #jnz rel8 --- 0x75 cb (note: treat cb as ib)
+    
+    #jnz rel32 --- 0x0f 0x85 cd (Note: treat cd as id)
+
+    return None
+
+def parse_lea(instr):
+    '''
+    instr: A bytearray of instructions
+    This function determines if the instruction is lea
+    and formats a line to be printed.
+    '''
+    #lea r32, m --- 0x8d /r (note: addressing mode 11 is illegal)
 
     return None
 
@@ -428,14 +609,12 @@ def parse_mov(instr):
     if b'\xc7' == instr[0:1] and len(instr) > 2:
         mod, reg, rm = parse_modrm(instr[1])
         if reg == 0 :
-            log.info("Found mov r/m32, immediate")
             result = rm32immediate(instr, mod, reg, rm, 'mov')
             if result :
                 return result
 
     #mov r/m32, r32 --- 0x89 /r
     if b'\x89' == instr[0:1] and len(instr) > 1:
-        log.info('Found mov r/m32, r32')
         mod, reg, rm = parse_modrm(instr[1])
         result = rm32r32(instr, mod, reg, rm, 'mov')
         if result :
@@ -443,7 +622,6 @@ def parse_mov(instr):
 
     #mov r32, r/m32 --- 0x8b /r
     if b'\x8b' == instr[0:1] and len(instr) > 1:
-        log.info('Found mov r32, r/m32')
         mod, reg, rm = parse_modrm(instr[1])
         result = r32rm32(instr, mod, reg, rm, 'mov')
         if result :
@@ -451,6 +629,77 @@ def parse_mov(instr):
 
     return None
 
+
+def parse_movsd(instr):
+    '''
+    instr: A bytearray of instructions
+    This function determines if the instruction is movsd
+    and formats a line to be printed.
+    '''
+    #movsd --- 0xa5
+
+    return None
+
+def parse_mul(instr):
+    '''
+    instr: A bytearray of instructions
+    This function determines if the instruction is mul
+    and formats a line to be printed.
+    '''
+    #mul r/m32 --- 0xf7 /4
+    if b'\xf7' == instr[0:1] and len(instr) > 1:
+        mod, reg, rm = parse_modrm(instr[1])
+        if reg == 4 :
+            result = rm32(instr, mod, rm, 'mul')
+            if result :
+                return result
+
+    return None
+
+def parse_neg(instr):
+    '''
+    instr: A bytearray of instructions
+    This function determines if the instruction is neg
+    and formats a line to be printed.
+    '''
+    #neg r/m32 --- 0xf7 /3
+    if b'\xf7' == instr[0:1] and len(instr) > 1:
+        mod, reg, rm = parse_modrm(instr[1])
+        if reg == 3 :
+            result = rm32(instr, mod, rm, 'neg')
+            if result :
+                return result
+
+    return None
+
+def parse_nop(instr):
+    '''
+    instr: A bytearray of instructions
+    This function determines if the instruction is nop
+    and formats a line to be printed.
+    '''
+    #nop --- 0x90
+    if b'\x90' == instr[0:1] :
+        log.info('Found nop')
+        return format_instr(instr, 'nop')
+
+    return None
+
+def parse_not(instr):
+    '''
+    instr: A bytearray of instructions
+    This function determines if the instruction is not
+    and formats a line to be printed.
+    '''
+    #not r/m32 --- 0xf7 /2
+    if b'\xf7' == instr[0:1] and len(instr) > 1:
+        mod, reg, rm = parse_modrm(instr[1])
+        if reg == 2 :
+            result = rm32(instr, mod, rm, 'not')
+            if result :
+                return result
+
+    return None
 
 def parse_or(instr) :
     '''
@@ -468,14 +717,12 @@ def parse_or(instr) :
     if b'\x81' == instr[0:1] and len(instr) > 2:
         mod, reg, rm = parse_modrm(instr[1])
         if reg == 1 :
-            log.info("Found or r/m32, immediate")
             result = rm32immediate(instr, mod, reg, rm, 'or')
             if result :
                 return result
 
     #or r/m32, r32 --- 0x09 /r
     if b'\x09' == instr[0:1] and len(instr) > 1:
-        log.info('Found or r/m32, r32')
         mod, reg, rm = parse_modrm(instr[1])
         result = rm32r32(instr, mod, reg, rm, 'or')
         if result :
@@ -483,11 +730,112 @@ def parse_or(instr) :
 
     #or r32, r/m32 --- 0x0b /r
     if b'\x0b' == instr[0:1] and len(instr) > 1:
-        log.info('Found or r32, r/m32')
         mod, reg, rm = parse_modrm(instr[1])
         result = r32rm32(instr, mod, reg, rm, 'or')
         if result :
             return result
+
+    return None
+
+def parse_out(instr):
+    '''
+    instr: A bytearray of instructions
+    This function determines if the instruction is out
+    and formats a line to be printed.
+    '''
+    #out imm8, eax --- 0xe7 ib
+
+    return None
+
+def parse_pop(instr):
+    '''
+    instr: A bytearray of instructions
+    This function determines if the instruction is pop
+    and formats a line to be printed.
+    '''
+    #pop r/m32 --- 0x8f /0
+    if b'\x8f' == instr[0:1] and len(instr) > 1:
+        mod, reg, rm = parse_modrm(instr[1])
+        if reg == 0 :
+            result = rm32(instr, mod, rm, 'pop')
+            if result :
+                return result
+
+    #pop r32 --- 0x58 + rd
+    if 1 == len(instr) :
+        register = additive_check(instr[0:1], b'\x58')
+        if register != None :
+            log.info("Found pop r32")
+            return format_instr(instr, 'pop', register)
+
+    return None
+
+def parse_push(instr):
+    '''
+    instr: A bytearray of instructions
+    This function determines if the instruction is push
+    and formats a line to be printed.
+    '''
+    #push r/m32 --- 0xff /6
+    if b'\xff' == instr[0:1] and len(instr) > 1:
+        mod, reg, rm = parse_modrm(instr[1])
+        if reg == 6 :
+            result = rm32(instr, mod, rm, 'push')
+            if result :
+                return result
+
+    #push r32 --- 0x50 + rd
+    if 1 == len(instr) :
+        register = additive_check(instr[0:1], b'\x50')
+        if register != None :
+            log.info("Found push r32")
+            return format_instr(instr, 'push', register)
+
+    #push imm32 --- 0x68 id
+    if 5 == len(instr) and b'\x68' == instr[0:1]:
+        log.info('Found push imm32')
+        immediate = format_little_endian(instr[1:])
+        return format_instr(instr, 'push', immediate)
+
+    return None
+
+def parse_repne(instr):
+    '''
+    instr: A bytearray of instructions
+    This function determines if the instruction is repne
+    and formats a line to be printed.
+    '''
+    #repne cmpsd --- 0xf2 0xa7 (Note: 0xf2 is the repne prefix)
+
+    return None
+
+def parse_ret(instr):
+    '''
+    instr: A bytearray of instructions
+    This function determines if the instruction is retf/retn
+    and formats a line to be printed.
+    '''
+    #retf --- 0xcb
+
+    #retf imm16 --- 0xca iw (note: iw is a 16-bit immediate)
+
+    #retn --- 0xc3
+
+    #retn imm16 --- 0xc2 iw (note: iw is a 16-bit immediate)
+
+    return None
+
+def parse_salsarshr(instr):
+    '''
+    instr: A bytearray of instructions
+    This function determines if the instruction is sal/sar/shr
+    and formats a line to be printed.
+    '''
+    #sal r/m32, 1 --- 0xd1 /4
+
+    #sar r/m32, 1 --- 0xd1 /7
+
+    #shr r/m32, 1 --- 0xd1 /5
 
     return None
 
@@ -507,14 +855,12 @@ def parse_sbb(instr):
     if b'\x81' == instr[0:1] and len(instr) > 2:
         mod, reg, rm = parse_modrm(instr[1])
         if reg == 3 :
-            log.info("Found sbb r/m32, immediate")
             result = rm32immediate(instr, mod, reg, rm, 'sbb')
             if result :
                 return result
     
     #sbb r/m32, r32 --- 0x19 /r
     if b'\x19' == instr[0:1] and len(instr) > 1:
-        log.info('Found sbb r/m32, r32')
         mod, reg, rm = parse_modrm(instr[1])
         result = rm32r32(instr, mod, reg, rm, 'sbb')
         if result :
@@ -522,7 +868,6 @@ def parse_sbb(instr):
 
     #sbb r32, r/m32 --- 0x1b /r
     if b'\x1b' == instr[0:1] and len(instr) > 1:
-        log.info('Found sbb r32, r/m32')
         mod, reg, rm = parse_modrm(instr[1])
         result = r32rm32(instr, mod, reg, rm, 'sbb')
         if result :
@@ -546,14 +891,12 @@ def parse_sub(instr):
     if b'\x81' == instr[0:1] and len(instr) > 2:
         mod, reg, rm = parse_modrm(instr[1])
         if reg == 5 :
-            log.info("Found sub r/m32, immediate")
             result = rm32immediate(instr, mod, reg, rm, 'sub')
             if result :
                 return result
 
     #sub r/m32, r32 --- 0x29 /r
     if b'\x29' == instr[0:1] and len(instr) > 1:
-        log.info('Found sub r/m32, r32')
         mod, reg, rm = parse_modrm(instr[1])
         result = rm32r32(instr, mod, reg, rm, 'sub')
         if result :
@@ -561,7 +904,6 @@ def parse_sub(instr):
 
     #sub r32, r/m32 --- 0x2b /r
     if b'\x2b' == instr[0:1] and len(instr) > 1:
-        log.info('Found sub r32, r/m32')
         mod, reg, rm = parse_modrm(instr[1])
         result = r32rm32(instr, mod, reg, rm, 'sub')
         if result :
@@ -585,14 +927,12 @@ def parse_test(instr):
     if b'\xf7' == instr[0:1] and len(instr) > 2:
         mod, reg, rm = parse_modrm(instr[1])
         if reg == 0 :
-            log.info("Found test r/m32, immediate")
             result = rm32immediate(instr, mod, reg, rm, 'test')
             if result :
                 return result
 
     #test r/m32, r32 --- 0x85 /r
     if b'\x85' == instr[0:1] and len(instr) > 1:
-        log.info('Found test r/m32, r32')
         mod, reg, rm = parse_modrm(instr[1])
         result = rm32r32(instr, mod, reg, rm, 'test')
         if result :
@@ -616,14 +956,12 @@ def parse_xor(instr):
     if b'\x81' == instr[0:1] and len(instr) > 2:
         mod, reg, rm = parse_modrm(instr[1])
         if reg == 6 :
-            log.info("Found xor r/m32, immediate")
             result = rm32immediate(instr, mod, reg, rm, 'xor')
             if result :
                 return result
 
     #xor r/m32, r32 --- 0x31 /r
     if b'\x31' == instr[0:1] and len(instr) > 1:
-        log.info('Found xor r/m32, r32')
         mod, reg, rm = parse_modrm(instr[1])
         result = rm32r32(instr, mod, reg, rm, 'xor')
         if result :
@@ -631,7 +969,6 @@ def parse_xor(instr):
 
     #xor r32, r/m32 --- 0x33 /r
     if b'\x33' == instr[0:1] and len(instr) > 1:
-        log.info('Found xor r32, r/m32')
         mod, reg, rm = parse_modrm(instr[1])
         result = r32rm32(instr, mod, reg, rm, 'xor')
         if result :
@@ -651,7 +988,12 @@ def parse(instruction):
         b'\xf7', b'\x01', b'\x21', b'\x39', b'\x89', b'\x09', b'\x19', \
         b'\x29', b'\x85', b'\x31', b'\x03', b'\x23', b'\x3b', b'\x8b', \
         b'\x0b', b'\x1b', b'\x2b', b'\x33', b'\xb8', b'\xb9', b'\xba', \
-        b'\xbb', b'\xbc', b'\xbd', b'\xbe', b'\xbf']
+        b'\xbb', b'\xbc', b'\xbd', b'\xbe', b'\xbf', b'\xff', b'\x48', \
+        b'\x49', b'\x4a', b'\x4b', b'\x4c', b'\x4d', b'\x4e', b'\x4f', \
+        b'\x40', b'\x41', b'\x42', b'\x43', b'\x44', b'\x45', b'\x46', \
+        b'\x47', b'\xf7', b'\x8f', b'\x50', b'\x51', b'\x52', b'\x53', \
+        b'\x54', b'\x55', b'\x56', b'\x57', b'\x58', b'\x59', b'\x5a', \
+        b'\x5b', b'\x5c', b'\x5d', b'\x5e', b'\x5f', b'\x68', b'\x90']
     if instruction[0:1] not in known_starts :
         log.info("Found an unknown instruction.")
         result = format_unknown(instruction[0])
@@ -659,7 +1001,11 @@ def parse(instruction):
 
     #now run through each of the parsers to find assembly 
     parsers = [parse_int3, parse_cpuid, parse_add, parse_and, parse_cmp, \
-         parse_mov, parse_or, parse_sbb, parse_sub, parse_test, parse_xor]
+         parse_dec, parse_idiv, parse_imul, parse_inc, \
+         parse_mov, parse_mul, parse_neg, parse_nop, parse_not, parse_or, \
+         parse_pop, \
+         parse_push, parse_sbb, parse_sub, \
+         parse_test, parse_xor]
     for p in parsers:
         result = p(instruction)
         if result:
