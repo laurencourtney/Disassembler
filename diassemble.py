@@ -39,9 +39,8 @@ def format_label(address):
 
 def format_little_endian(hexbytes) :
     '''
-    hexbytes: A bytearray - 4 bytes long, usually an immediate or 
-    displacement. This function will convert it into a little endian 
-    string. 
+    hexbytes: A bytearray - usually an immediate or displacement. 
+    This function will convert it into a little endian string. 
     '''
     imm = '0x' + ''.join(['{:02x}'.format(x) for x in hexbytes[::-1]])
     return imm
@@ -523,8 +522,23 @@ def parse_imul(instr):
                 return result
 
     #imul r32, r/m32 --- 0x0f 0xaf /r
+    if len(instr) > 2 :
+        if b'\x0f' == instr[0:1] and b'\xaf' == instr[1:2]:
+            mod, reg, rm = parse_modrm(instr[2])
+            result = r32rm32(instr[1:], mod, reg, rm, 'imul')
+            if result :
+                #TODO formatting hack to account for the longer opcode, rethink
+                return '0f' + result[:20] + result[22:]
 
     #imul r32, r/m32, imm32 --- 0x69 /r id
+    if b'\x69' == instr[0:1] and len(instr) > 1:
+        mod, reg, rm = parse_modrm(instr[1])
+        result = r32rm32(instr[:-4], mod, reg, rm, 'imul')
+        immediate = format_little_endian(instr[-4:])
+        if result :
+            #TODO formatting hack to account for the third opcode, revisit
+            imm_part = ''.join(['{:02x}'.format(x) for x in instr[-4:]])
+            return result[:len(instr)*2-8] + imm_part + result[len(instr)*2:] + ", " + immediate
 
     return None
 
@@ -637,6 +651,9 @@ def parse_movsd(instr):
     and formats a line to be printed.
     '''
     #movsd --- 0xa5
+    if b'\xa5' == instr[0:1] :
+        log.info('Found movsd')
+        return format_instr(instr, 'movsd')
 
     return None
 
@@ -744,6 +761,10 @@ def parse_out(instr):
     and formats a line to be printed.
     '''
     #out imm8, eax --- 0xe7 ib
+    if b'\xe7' == instr[0:1] and len(instr) == 2 :
+        log.info('Found out imm8, eax')
+        imm = format_little_endian(instr[1:2])
+        return format_instr(instr, 'out', imm, 'eax')
 
     return None
 
@@ -806,6 +827,9 @@ def parse_repne(instr):
     and formats a line to be printed.
     '''
     #repne cmpsd --- 0xf2 0xa7 (Note: 0xf2 is the repne prefix)
+    if b'\xf2' == instr[0:1] and len(instr) == 2 and b'\xa7' == instr[1:2]:
+        log.info('Found repne cmpsd')
+        return format_instr(instr, 'repne cmpsd')
 
     return None
 
@@ -816,12 +840,26 @@ def parse_ret(instr):
     and formats a line to be printed.
     '''
     #retf --- 0xcb
+    if b'\xcb' == instr[0:1] :
+        log.info('Found retf')
+        return format_instr(instr, 'retf')
 
     #retf imm16 --- 0xca iw (note: iw is a 16-bit immediate)
+    if b'\xca' == instr[0:1] and len(instr) == 3 :
+        log.info('Found retf imm16')
+        imm = format_little_endian(instr[1:])
+        return format_instr(instr, 'retf', imm)
 
     #retn --- 0xc3
+    if b'\xc3' == instr[0:1] :
+        log.info('Found retn')
+        return format_instr(instr, 'retn')
 
     #retn imm16 --- 0xc2 iw (note: iw is a 16-bit immediate)
+    if b'\xc2' == instr[0:1] and len(instr) == 3 :
+        log.info('Found retn imm16')
+        imm = format_little_endian(instr[1:])
+        return format_instr(instr, 'retn', imm)
 
     return None
 
@@ -831,11 +869,28 @@ def parse_salsarshr(instr):
     This function determines if the instruction is sal/sar/shr
     and formats a line to be printed.
     '''
-    #sal r/m32, 1 --- 0xd1 /4
+    if b'\xd1' == instr[0:1] and len(instr) > 1 :
+        mod, reg, rm = parse_modrm(instr[1])
+        #sal r/m32, 1 --- 0xd1 /4
+        if reg == 4 :
+            result = rm32(instr, mod, rm, 'sal')
+            if result :
+                log.info('Found sal r/m32, 1')
+                return result + ', 1'
+    
+        #sar r/m32, 1 --- 0xd1 /7
+        if reg == 7 :
+            result = rm32(instr, mod, rm, 'sar')
+            if result :
+                log.info('Found sar r/m32, 1')
+                return result + ', 1'
 
-    #sar r/m32, 1 --- 0xd1 /7
-
-    #shr r/m32, 1 --- 0xd1 /5
+        #shr r/m32, 1 --- 0xd1 /5
+        if reg == 5 :
+            result = rm32(instr, mod, rm, 'shr')
+            if result :
+                log.info('Found shr r/m32, 1')
+                return result + ', 1'
 
     return None
 
@@ -993,7 +1048,9 @@ def parse(instruction):
         b'\x40', b'\x41', b'\x42', b'\x43', b'\x44', b'\x45', b'\x46', \
         b'\x47', b'\xf7', b'\x8f', b'\x50', b'\x51', b'\x52', b'\x53', \
         b'\x54', b'\x55', b'\x56', b'\x57', b'\x58', b'\x59', b'\x5a', \
-        b'\x5b', b'\x5c', b'\x5d', b'\x5e', b'\x5f', b'\x68', b'\x90']
+        b'\x5b', b'\x5c', b'\x5d', b'\x5e', b'\x5f', b'\x68', b'\x90', \
+        b'\x69', b'\xc2', b'\xc3', b'\xca', b'\xcb', b'\xe7', b'\xa5', \
+        b'\xd1', b'\xf2']
     if instruction[0:1] not in known_starts :
         log.info("Found an unknown instruction.")
         result = format_unknown(instruction[0])
@@ -1001,11 +1058,10 @@ def parse(instruction):
 
     #now run through each of the parsers to find assembly 
     parsers = [parse_int3, parse_cpuid, parse_add, parse_and, parse_cmp, \
-         parse_dec, parse_idiv, parse_imul, parse_inc, \
-         parse_mov, parse_mul, parse_neg, parse_nop, parse_not, parse_or, \
-         parse_pop, \
-         parse_push, parse_sbb, parse_sub, \
-         parse_test, parse_xor]
+         parse_dec, parse_idiv, parse_imul, parse_inc, parse_mov, parse_movsd, \
+         parse_mul, parse_neg, parse_nop, parse_not, parse_or, parse_out, \
+         parse_pop, parse_push, parse_repne, parse_ret, parse_salsarshr, \
+         parse_sbb, parse_sub, parse_test, parse_xor]
     for p in parsers:
         result = p(instruction)
         if result:
