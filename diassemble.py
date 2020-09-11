@@ -32,7 +32,7 @@ def format_unknown(hexbyte):
 
 def format_label(address):
     '''
-    address: What is the type?
+    address: What is the type? int?
     This function returns the string label for a jump's address.
     '''
     return 'offset_{:08x}h:\n'.format(address)
@@ -55,7 +55,7 @@ def format_instr(hexbytes, mnemonic, op1=None, op2=None, op3=None):
     This function takes in the instruction and the text of the assembly
     opcode and operands to format the return string that will be printed.
     Format will be:
-    31c0                    mov eax, eax (not the correct instruction)
+    89c8                    mov eax, ecx
     '''
     line = format_line(hexbytes, mnemonic)
     if op1:
@@ -468,13 +468,6 @@ def parse_cpuid(instr):
         return format_line(instr, 'cpuid')
     return None
 
-'''
-# This is not really "mov eax, eax", only an example of a formatted instruction
-def parse_fake_mov(instr):
-    if 2 == len(instr) and b'\xff\xc0' == instr:
-        log.info('Found fake mov!')
-        return format_instr(instr, 'mov', 'eax', 'eax')
-'''
 
 def parse_add(instr):
     '''
@@ -512,6 +505,7 @@ def parse_add(instr):
 
     return None
 
+
 def parse_and(instr):
     '''
     instr: A bytearray of instructions
@@ -548,16 +542,31 @@ def parse_and(instr):
 
     return None
 
+
 def parse_call(instr):
     '''
     instr: A bytearray of instructions
     This function determines if the instruction is call
-    and formats a line to be printed.
+    and if so it returns a list, the first value is an 
+    integer indicating the offset for the call and the second
+    is a string indicating the instruction type ('call').
     '''
     #call rel32 --- 0xe8 cd (note, treat cd as id)
+    if len(instr) == 5 and b'\xe8' == instr[0:1] :
+        log.info('Found call rel32')
+        offset = int.from_bytes(instr[1:], 'little', signed=True)
+        return [offset, 'call']
 
     #call r/m32 --- 0xff /2
+    if b'\xff' == instr[0:1] and len(instr) > 1:
+        mod, reg, rm = parse_modrm(instr[1])
+        if reg == 2 :
+            result = rm32(instr, mod, rm, 'call')
+            if result :
+                return result
+                
     return None
+
 
 def parse_clflush(instr):
     '''
@@ -574,6 +583,7 @@ def parse_clflush(instr):
                 return result
 
     return None
+
 
 def parse_cmp(instr):
     '''
@@ -611,6 +621,7 @@ def parse_cmp(instr):
 
     return None
 
+
 def parse_dec(instr):
     '''
     instr: A bytearray of instructions
@@ -634,6 +645,7 @@ def parse_dec(instr):
 
     return None
 
+
 def parse_idiv(instr):
     '''
     instr: A bytearray of instructions
@@ -649,6 +661,7 @@ def parse_idiv(instr):
                 return result
 
     return None
+
 
 def parse_imul(instr):
     '''
@@ -684,6 +697,7 @@ def parse_imul(instr):
 
     return None
 
+
 def parse_inc(instr):
     '''
     instr: A bytearray of instructions
@@ -707,6 +721,7 @@ def parse_inc(instr):
 
     return None
 
+
 def parse_jmp(instr):
     '''
     instr: A bytearray of instructions
@@ -714,12 +729,27 @@ def parse_jmp(instr):
     and formats a line to be printed.
     '''
     #jmp rel8 --- 0xeb cb (note: treat cb as ib)
+    if len(instr) == 2 and b'\xeb' == instr[0:1] :
+        log.info('Found jmp rel8')
+        offset = int.from_bytes(instr[1:], 'little', signed=True)
+        return [offset, 'jmp']
 
     #jmp rel32 --- 0xe9 cd (Note: treat cd as id)
+    if len(instr) == 5 and b'\xe9' == instr[0:1] :
+        log.info('Found jmp rel32')
+        offset = int.from_bytes(instr[1:], 'little', signed=True)
+        return [offset, 'jmp']
 
     #jmp r/m32 --- 0xff /4 
+    if b'\xff' == instr[0:1] and len(instr) > 1:
+        mod, reg, rm = parse_modrm(instr[1])
+        if reg == 4 :
+            result = rm32(instr, mod, rm, 'jmp')
+            if result :
+                return result
 
     return None
+
 
 def parse_jzjnz(instr):
     '''
@@ -728,14 +758,31 @@ def parse_jzjnz(instr):
     and formats a line to be printed.
     '''
     #jz rel8 --- 0x74 cb (note: treat cb as ib)
+    if len(instr) == 2 and b'\x74' == instr[0:1] :
+        log.info('Found jz rel8')
+        offset = int.from_bytes(instr[1:], 'little', signed=True)
+        return [offset, 'jz']
 
     #jz rel32 --- 0x0f 0x84 cd cd (Note: treat cd as id)
+    if len(instr) == 6 and b'\x0f' == instr[0:1] and b'\x84' == instr[1:2]:
+        log.info('Found jz rel32')
+        offset = int.from_bytes(instr[2:], 'little', signed=True)
+        return [offset, 'jz']
 
     #jnz rel8 --- 0x75 cb (note: treat cb as ib)
-    
+    if len(instr) == 2 and b'\x75' == instr[0:1] :
+        log.info('Found jnz rel8')
+        offset = int.from_bytes(instr[1:], 'little', signed=True)
+        return [offset, 'jnz']
+
     #jnz rel32 --- 0x0f 0x85 cd (Note: treat cd as id)
+    if len(instr) == 6 and b'\x0f' == instr[0:1] and b'\x85' == instr[1:2]:
+        log.info('Found jnz rel32')
+        offset = int.from_bytes(instr[2:], 'little', signed=True)
+        return [offset, 'jnz']
 
     return None
+
 
 def parse_lea(instr):
     '''
@@ -751,6 +798,7 @@ def parse_lea(instr):
             return result
 
     return None
+
 
 def parse_mov(instr):
     '''
@@ -804,6 +852,7 @@ def parse_movsd(instr):
 
     return None
 
+
 def parse_mul(instr):
     '''
     instr: A bytearray of instructions
@@ -819,6 +868,7 @@ def parse_mul(instr):
                 return result
 
     return None
+
 
 def parse_neg(instr):
     '''
@@ -836,6 +886,7 @@ def parse_neg(instr):
 
     return None
 
+
 def parse_nop(instr):
     '''
     instr: A bytearray of instructions
@@ -848,6 +899,7 @@ def parse_nop(instr):
         return format_instr(instr, 'nop')
 
     return None
+
 
 def parse_not(instr):
     '''
@@ -864,6 +916,7 @@ def parse_not(instr):
                 return result
 
     return None
+
 
 def parse_or(instr) :
     '''
@@ -901,6 +954,7 @@ def parse_or(instr) :
 
     return None
 
+
 def parse_out(instr):
     '''
     instr: A bytearray of instructions
@@ -914,6 +968,7 @@ def parse_out(instr):
         return format_instr(instr, 'out', imm, 'eax')
 
     return None
+
 
 def parse_pop(instr):
     '''
@@ -937,6 +992,7 @@ def parse_pop(instr):
             return format_instr(instr, 'pop', register)
 
     return None
+
 
 def parse_push(instr):
     '''
@@ -967,6 +1023,7 @@ def parse_push(instr):
 
     return None
 
+
 def parse_repne(instr):
     '''
     instr: A bytearray of instructions
@@ -979,6 +1036,7 @@ def parse_repne(instr):
         return format_instr(instr, 'repne cmpsd')
 
     return None
+
 
 def parse_ret(instr):
     '''
@@ -1010,6 +1068,7 @@ def parse_ret(instr):
 
     return None
 
+
 def parse_salsarshr(instr):
     '''
     instr: A bytearray of instructions
@@ -1040,6 +1099,7 @@ def parse_salsarshr(instr):
                 return result + ', 1'
 
     return None
+
 
 def parse_sbb(instr):
     '''
@@ -1077,6 +1137,7 @@ def parse_sbb(instr):
 
     return None
 
+
 def parse_sub(instr):
     '''
     instr: A bytearray of instructions
@@ -1113,6 +1174,7 @@ def parse_sub(instr):
 
     return None
 
+
 def parse_test(instr):
     '''
     instr: A bytearray of instructions
@@ -1141,6 +1203,7 @@ def parse_test(instr):
             return result
 
     return None
+
 
 def parse_xor(instr):
     '''
@@ -1178,6 +1241,7 @@ def parse_xor(instr):
 
     return None
 
+
 def parse(instruction):
     '''
     instruction: A bytearray of instructions
@@ -1197,17 +1261,17 @@ def parse(instruction):
         b'\x54', b'\x55', b'\x56', b'\x57', b'\x58', b'\x59', b'\x5a', \
         b'\x5b', b'\x5c', b'\x5d', b'\x5e', b'\x5f', b'\x68', b'\x90', \
         b'\x69', b'\xc2', b'\xc3', b'\xca', b'\xcb', b'\xe7', b'\xa5', \
-        b'\xd1', b'\xf2', b'\x8d']
+        b'\xd1', b'\xf2', b'\x8d', b'\xe8', b'\xeb', b'\xe9', b'\x74', \
+        b'\x75']
     if instruction[0:1] not in known_starts :
         log.info("Found an unknown instruction.")
         result = format_unknown(instruction[0])
         return result
 
     #now run through each of the parsers to find assembly 
-    parsers = [parse_int3, parse_cpuid, parse_add, parse_and, \
-         parse_clflush, parse_cmp, parse_dec, parse_idiv, parse_imul, parse_inc,\
-         parse_lea, parse_mov, \
-         parse_movsd, \
+    parsers = [parse_int3, parse_cpuid, parse_add, parse_and, parse_call, \
+         parse_clflush, parse_cmp, parse_dec, parse_idiv, parse_imul, \
+         parse_inc, parse_jmp, parse_jzjnz, parse_lea, parse_mov, parse_movsd, \
          parse_mul, parse_neg, parse_nop, parse_not, parse_or, parse_out, \
          parse_pop, parse_push, parse_repne, parse_ret, parse_salsarshr, \
          parse_sbb, parse_sub, parse_test, parse_xor]
@@ -1217,6 +1281,7 @@ def parse(instruction):
             return result
 
     return None
+
 
 def disassemble(new_instr, instructions, offset) :
     '''
@@ -1229,11 +1294,26 @@ def disassemble(new_instr, instructions, offset) :
     parsed, the array of values that needs to be printed, and the offset
     '''
     instr = bytearray()
+    labels = []
     for b in new_instr :
         instr.append(b)
         log.debug('Testing instruction: {}'.format(binascii.hexlify(instr)))
         result = parse(instr)
         if result:
+            if type(result) == list :
+                #calculate the label -result[0] is the integer offset
+                next_offset = offset + 1
+                label = format_label(result[0] + next_offset) 
+                #add the label to the instruction list, start it with 00000
+                #this makes sure that it sorts before the instruction there
+                #keeps a running list of labels to avoid redundancy
+                if label not in labels :
+                    instructions.append((result[0]+next_offset,'00000' + label))
+                    labels.append(label)
+                #format the result so that the branch instr will be added
+                #result[1] is the mnemonic
+                result = format_instr(instr, result[1], label[:-2])
+            
             instr_offset = offset + 1 - len(instr)
             log.info('Adding instruction for offset {}'.format(instr_offset))
             instructions.append((instr_offset, result))
@@ -1274,30 +1354,17 @@ if '__main__' == __name__:
         instructions.append((offset, format_unknown(instr[0])))
         offset+=1
         instr, instructions, offset = disassemble(instr[1:], instructions, offset)
-    '''
-    The old way of doing things, the thing above seems to work but 
-    I should test some more edge cases. 
-    for b in inbytes:
-        instr.append(b)
-        log.debug('Testing instruction: {}'.format(binascii.hexlify(instr)))
-        result = parse(instr)
-        if result:
-            instr_offset = offset + 1 - len(instr)
-            log.info('Adding instruction for offset {}'.format(instr_offset))
-            instructions.append((instr_offset, result))
-            instr = bytearray()
-        offset += 1
-    #one way to tell if there was a known instruction that didn't parse
-    #would be if I get to the end of this for loop and len(instr) != 0
-    #i want to turn this into a function and pass in instr[1:] to the
-    #function to run again, while first parsing the first thing in
-    #instructions as something i dont know how to do, the function will 
-    #need to return instr, instructions, and offset. 
-    '''
+
     log.debug('Creating output data')
     output = ''
-    for (offset, text) in instructions:
-        output += '{:08x}:   {}\n'.format(offset, text)
+    #sort the instructions so the labels end up in the correct spot
+    instructions_sorted = sorted(instructions)
+    for (offset, text) in instructions_sorted:
+        if text[0:5] == '00000' :
+            #print a label
+            output += text[5:]
+        else:
+            output += '{:08x}:   {}\n'.format(offset, text)
 
     log.debug('Attempting to write output')
     print(output)
