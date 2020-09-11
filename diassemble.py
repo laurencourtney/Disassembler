@@ -119,29 +119,35 @@ def parse_register(reg):
         return 'edi'
     return None
 
-def rm32immediate(instr, mod, reg, rm, op):
+def rm32immediate(instr, mod, reg, rm, op, prefix=False):
     '''
     instr: A bytearray with the instructions
     mod: An integer representing the mod bits
     reg: An integer representing the reg bits
     rm: An interger representing the rm bits
     op:  A string indicated the instruction/mnemonic (i.e. 'add')
+    prefix: A boolean to indicate if the instruction has a prefix
     This function parses out the different modes for instructions with
     format 'add r/m32 imm32'. It returns assembly language strings. 
     '''
+    full_instr = instr
+    if prefix == True :
+        #this is so the length checks are consistent
+        instr = instr[1:]
+
     #first check for shorter instructions with just an immediate
     if 6 == len(instr) :
         if mod == 0 and rm != 5:
             register = parse_register(rm)
             immediate = format_little_endian(instr[2:])
             log.info('Found {} r/m32, imm32'.format(op))
-            return format_instr(instr, op, '[{}]'.format(register), immediate)
+            return format_instr(full_instr, op, '[{}]'.format(register), immediate)
 
         if mod == 3 :
             register = parse_register(rm)
             immediate = format_little_endian(instr[2:])
             log.info('Found {} r/m32, imm32'.format(op))
-            return format_instr(instr, op, register, immediate)
+            return format_instr(full_instr, op, register, immediate)
             
     #check for instructions with an immediate and an 8 bit displacent
     if 7 == len(instr) :
@@ -150,7 +156,7 @@ def rm32immediate(instr, mod, reg, rm, op):
             disp = '0x{:02x}'.format(instr[2])
             immediate = format_little_endian(instr[3:])
             log.info('Found {} r/m32, imm32'.format(op))
-            return format_instr(instr, op, '[{} + {}]'.format(register, disp), immediate)
+            return format_instr(full_instr, op, '[{} + {}]'.format(register, disp), immediate)
 
     #now check for longer instructions with a 32 bit displacement
     if 10 == len(instr) :
@@ -158,39 +164,45 @@ def rm32immediate(instr, mod, reg, rm, op):
             disp = format_little_endian(instr[2:6])
             immediate = format_little_endian(instr[6:10])
             log.info('Found {} r/m32, imm32'.format(op))
-            return format_instr(instr, op, '[{}]'.format(disp), immediate)
+            return format_instr(full_instr, op, '[{}]'.format(disp), immediate)
         if mod == 2 :
             register = parse_register(rm)
             disp = format_little_endian(instr[2:6])
             immediate = format_little_endian(instr[6:10])
             log.info('Found {} r/m32, imm32'.format(op))
-            return format_instr(instr, op, '[{} + {}]'.format(register, disp), immediate)
+            return format_instr(full_instr, op, '[{} + {}]'.format(register, disp), immediate)
     
     return None
 
-def rm32r32(instr, mod, reg, rm, op) :
+def rm32r32(instr, mod, reg, rm, op, prefix=False) :
     '''
     instr: A bytearray with the instructions
     mod: An integer representing the mod bits
     reg: An integer representing the reg bits
     rm: An interger representing the rm bits
     op:  A string indicated the instruction/mnemonic (i.e. 'add')
+    prefix: A boolean to indicate if the instruction has a prefix
     This function parses out the different modes for instructions with 
     format 'add r/m32, r32'. It returns assembly language strings.
     '''
+    full_instr = instr
+    if prefix == True :
+        #this is so the length checks are consistent
+        instr = instr[1:]
+
     #first check for shorter instructions with just a register
     if 2 == len(instr) :
         if mod == 0 and rm != 5:
             reg_str = parse_register(reg)
             rm_str = parse_register(rm)
             log.info('Found {} r/m32, r32'.format(op))
-            return format_instr(instr, op, '[{}]'.format(rm_str), reg_str)
+            return format_instr(full_instr, op, '[{}]'.format(rm_str), reg_str)
 
         if mod == 3 :
             reg_str = parse_register(reg)
             rm_str = parse_register(rm)
             log.info('Found {} r/m32, r32'.format(op))
-            return format_instr(instr, op, rm_str, reg_str)
+            return format_instr(full_instr, op, rm_str, reg_str)
             
     #check for instructions with an 8 bit displacent
     if 3 == len(instr) :
@@ -199,7 +211,7 @@ def rm32r32(instr, mod, reg, rm, op) :
             rm_str = parse_register(rm)
             disp = '0x{:02x}'.format(instr[2])
             log.info('Found {} r/m32, r32'.format(op))
-            return format_instr(instr, op, '[{} + {}]'.format(rm_str, disp), reg_str)
+            return format_instr(full_instr, op, '[{} + {}]'.format(rm_str, disp), reg_str)
             
     #now check for longer instructions with a 32 bit displacement
     if 6 == len(instr) :
@@ -207,38 +219,47 @@ def rm32r32(instr, mod, reg, rm, op) :
             disp = format_little_endian(instr[2:6])
             reg_str = parse_register(reg)
             log.info('Found {} r/m32, r32'.format(op))
-            return format_instr(instr, op, '[{}]'.format(disp), reg_str)
+            return format_instr(full_instr, op, '[{}]'.format(disp), reg_str)
 
         if mod == 2 :
             reg_str = parse_register(reg)
             disp = format_little_endian(instr[2:6])
             rm_str = parse_register(rm)
             log.info('Found {} r/m32, r32'.format(op))
-            return format_instr(instr, op, '[{} + {}]'.format(rm_str, disp), reg_str)
+            return format_instr(full_instr, op, '[{} + {}]'.format(rm_str, disp), reg_str)
+    
+    return None
 
-def r32rm32(instr, mod, reg, rm, op) :
+
+def r32rm32(instr, mod, reg, rm, op, prefix=False) :
     '''
-    instr: A bytearray with the instructions
+    instr: A bytearray with the instructions - should not include prefixes
     mod: An integer representing the mod bits
     reg: An integer representing the reg bits
     rm: An interger representing the rm bits
     op:  A string indicated the instruction/mnemonic (i.e. 'add')
+    prefix: A boolean to indicate if the instruction has a prefix
     This function parses out the different modes for instructions with 
     format 'add r32, r/m32'. It returns assembly language strings.
     '''
+    full_instr = instr
+    if prefix == True :
+        #this is so the length checks are consistent
+        instr = instr[1:]
+
     #first check for shorter instructions with just a register
     if 2 == len(instr) :
         if mod == 0 and rm != 5:
             reg_str = parse_register(reg)
             rm_str = parse_register(rm)
             log.info('Found {} r32, r/m32'.format(op))
-            return format_instr(instr, op, reg_str, '[{}]'.format(rm_str))
+            return format_instr(full_instr, op, reg_str, '[{}]'.format(rm_str))
 
         if mod == 3 :
             reg_str = parse_register(reg)
             rm_str = parse_register(rm)
             log.info('Found {} r32, r/m32'.format(op))
-            return format_instr(instr, op, reg_str, rm_str)
+            return format_instr(full_instr, op, reg_str, rm_str)
             
     #check for instructions with an 8 bit displacent
     if 3 == len(instr) :
@@ -247,7 +268,7 @@ def r32rm32(instr, mod, reg, rm, op) :
             rm_str = parse_register(rm)
             disp = '0x{:02x}'.format(instr[2])
             log.info('Found {} r32, r/m32'.format(op))
-            return format_instr(instr, op, reg_str, '[{} + {}]'.format(rm_str, disp))
+            return format_instr(full_instr, op, reg_str, '[{} + {}]'.format(rm_str, disp))
             
     #now check for longer instructions with a 32 bit displacement
     if 6 == len(instr) :
@@ -255,35 +276,44 @@ def r32rm32(instr, mod, reg, rm, op) :
             disp = format_little_endian(instr[2:6])
             reg_str = parse_register(reg)
             log.info('Found {} r32, r/m32'.format(op))
-            return format_instr(instr, op, reg_str, '[{}]'.format(disp))
+            return format_instr(full_instr, op, reg_str, '[{}]'.format(disp))
 
         if mod == 2 :
             reg_str = parse_register(reg)
             disp = format_little_endian(instr[2:6])
             rm_str = parse_register(rm)
             log.info('Found {} r32, r/m32'.format(op))
-            return format_instr(instr, op, reg_str, '[{} + {}]'.format(rm_str, disp))
+            return format_instr(full_instr, op, reg_str, '[{} + {}]'.format(rm_str, disp))
+    
+    return None
 
-def rm32(instr, mod, rm, op) :
+
+def rm32(instr, mod, rm, op, prefix=False) :
     '''
     instr: A bytearray with the instructions
     mod: An integer representing the mod bits
     rm: An interger representing the rm bits
     op:  A string indicated the instruction/mnemonic (i.e. 'add')
+    prefix: A boolean to indicate if the instruction contains a prefix
     This function parses out the different modes for instructions with 
     format 'pop r/m32'. It returns assembly language strings.
     '''
+    full_instr = instr
+    if prefix == True :
+        #this is so the length checks are consistent
+        instr = instr[1:]
+    
     #first check for shorter instructions with just a register
     if 2 == len(instr) :
         if mod == 0 and rm != 5:
             rm_str = parse_register(rm)
             log.info('Found {} r/m32'.format(op))
-            return format_instr(instr, op, '[{}]'.format(rm_str))
+            return format_instr(full_instr, op, '[{}]'.format(rm_str))
 
         if mod == 3 :
             rm_str = parse_register(rm)
             log.info('Found {} r/m32'.format(op))
-            return format_instr(instr, op, rm_str)
+            return format_instr(full_instr, op, rm_str)
             
     #check for instructions with an 8 bit displacent
     if 3 == len(instr) :
@@ -291,20 +321,126 @@ def rm32(instr, mod, rm, op) :
             rm_str = parse_register(rm)
             disp = '0x{:02x}'.format(instr[2])
             log.info('Found {} r/m32'.format(op))
-            return format_instr(instr, op, '[{} + {}]'.format(rm_str, disp))
+            return format_instr(full_instr, op, '[{} + {}]'.format(rm_str, disp))
             
     #now check for longer instructions with a 32 bit displacement
     if 6 == len(instr) :
         if mod == 0 and rm == 5 :
             disp = format_little_endian(instr[2:6])
             log.info('Found {} r/m32'.format(op))
-            return format_instr(instr, op, '[{}]'.format(disp))
+            return format_instr(full_instr, op, '[{}]'.format(disp))
 
         if mod == 2 :
             disp = format_little_endian(instr[2:6])
             rm_str = parse_register(rm)
             log.info('Found {} r/m32'.format(op))
-            return format_instr(instr, op, '[{} + {}]'.format(rm_str, disp))
+            return format_instr(full_instr, op, '[{} + {}]'.format(rm_str, disp))
+
+    return None
+
+
+def r32m_address(instr, mod, reg, rm, op, prefix=False):
+    '''
+    instr: A bytearray with the instructions - should not include prefixes
+    mod: An integer representing the mod bits
+    rm: An interger representing the rm bits
+    op:  A string indicated the instruction/mnemonic (i.e. 'lea')
+    prefix: A boolean to indicate if the instruction has a prefix
+    This function parses out the different modes for instructions with 
+    format 'lea r32, m'. It is only lea at this time, but should
+    calculate the m address for any related instructions. Addressing mode
+    11 is illegal. It returns assembly language strings.
+    TODO does this need to be separate? Or could I add in an extra arg to make
+    11 illegal?
+    '''
+    full_instr = instr
+    if prefix == True :
+        #this is so the length checks are consistent
+        instr = instr[1:]
+    
+    #first check for shorter instructions with just a register
+    if 2 == len(instr) :
+        if mod == 0 and rm != 5:
+            reg_str = parse_register(reg)
+            m_str = parse_register(rm)
+            log.info('Found {} r32, m'.format(op))
+            return format_instr(full_instr, op, reg_str, '[{}]'.format(m_str))
+    #remove mod == 3 since this is illegal        
+    #check for instructions with an 8 bit displacent
+    if 3 == len(instr) :
+        if mod == 1 :
+            reg_str = parse_register(reg)
+            m_str = parse_register(rm)
+            disp = '0x{:02x}'.format(instr[2])
+            log.info('Found {} r32, r/m32'.format(op))
+            return format_instr(full_instr, op, reg_str, '[{} + {}]'.format(m_str, disp))
+            
+    #now check for longer instructions with a 32 bit displacement
+    if 6 == len(instr) :
+        if mod == 0 and rm == 5 :
+            disp = format_little_endian(instr[2:6])
+            reg_str = parse_register(reg)
+            log.info('Found {} r32, r/m32'.format(op))
+            return format_instr(full_instr, op, reg_str, '[{}]'.format(disp))
+
+        if mod == 2 :
+            reg_str = parse_register(reg)
+            disp = format_little_endian(instr[2:6])
+            m_str = parse_register(rm)
+            log.info('Found {} r32, r/m32'.format(op))
+            return format_instr(full_instr, op, reg_str, '[{} + {}]'.format(m_str, disp))
+    
+    return None
+
+
+def m_address(instr, mod, rm, op, prefix=False) :
+    '''
+    instr: A bytearray with the instructions
+    mod: An integer representing the mod bits
+    rm: An interger representing the rm bits
+    op:  A string indicated the instruction/mnemonic (i.e. 'add')
+    prefix: A boolean to indicate if the instruction has a prefix
+    This function parses out the different modes for instructions with 
+    format 'clflush m8'. Addressing mode 11 is illegal. This is just for
+    clflush at this time but should work for any related instructions. 
+    It returns assembly language strings.
+    TODO does this need to be separate? Or could I add in an extra arg to make
+    11 illegal?
+    '''
+    full_instr = instr
+    if prefix == True :
+        #this is so the length checks are consistent
+        instr = instr[1:]
+
+    #first check for shorter instructions with just a register
+    if 2 == len(instr) :
+        if mod == 0 and rm != 5:
+            m_str = parse_register(rm)
+            log.info('Found {} m8'.format(op))
+            return format_instr(full_instr, op, '[{}]'.format(m_str))
+    #remove mod == 3 since this is illegal
+    #check for instructions with an 8 bit displacent
+    if 3 == len(instr) :
+        if mod == 1 :
+            m_str = parse_register(rm)
+            disp = '0x{:02x}'.format(instr[2])
+            log.info('Found {} m8'.format(op))
+            return format_instr(full_instr, op, '[{} + {}]'.format(m_str, disp))
+            
+    #now check for longer instructions with a 32 bit displacement
+    if 6 == len(instr) :
+        if mod == 0 and rm == 5 :
+            disp = format_little_endian(instr[2:6])
+            log.info('Found {} m8'.format(op))
+            return format_instr(full_instr, op, '[{}]'.format(disp))
+
+        if mod == 2 :
+            disp = format_little_endian(instr[2:6])
+            m_str = parse_register(rm)
+            log.info('Found {} m8'.format(op))
+            return format_instr(full_instr, op, '[{} + {}]'.format(m_str, disp))
+    
+    return None
 
 
 def parse_int3(instr):
@@ -430,6 +566,13 @@ def parse_clflush(instr):
     and formats a line to be printed.
     '''
     #clflush m8 --- 0x0f 0xae /7 note: addressing mode 11 is illegal
+    if b'\x0f' == instr[0:1] and len(instr) > 2 and instr[1:2] == b'\xae':
+        mod, reg, rm = parse_modrm(instr[2])
+        if reg == 7 :
+            result = m_address(instr, mod, rm, 'clflush', True)
+            if result :
+                return result
+
     return None
 
 def parse_cmp(instr):
@@ -525,10 +668,9 @@ def parse_imul(instr):
     if len(instr) > 2 :
         if b'\x0f' == instr[0:1] and b'\xaf' == instr[1:2]:
             mod, reg, rm = parse_modrm(instr[2])
-            result = r32rm32(instr[1:], mod, reg, rm, 'imul')
+            result = r32rm32(instr, mod, reg, rm, 'imul', True)
             if result :
-                #TODO formatting hack to account for the longer opcode, rethink
-                return '0f' + result[:20] + result[22:]
+                return result
 
     #imul r32, r/m32, imm32 --- 0x69 /r id
     if b'\x69' == instr[0:1] and len(instr) > 1:
@@ -602,6 +744,11 @@ def parse_lea(instr):
     and formats a line to be printed.
     '''
     #lea r32, m --- 0x8d /r (note: addressing mode 11 is illegal)
+    if b'\x8d' == instr[0:1] and len(instr) > 1:
+        mod, reg, rm = parse_modrm(instr[1])
+        result = r32m_address(instr, mod, reg, rm, 'lea')
+        if result :
+            return result
 
     return None
 
@@ -1050,15 +1197,17 @@ def parse(instruction):
         b'\x54', b'\x55', b'\x56', b'\x57', b'\x58', b'\x59', b'\x5a', \
         b'\x5b', b'\x5c', b'\x5d', b'\x5e', b'\x5f', b'\x68', b'\x90', \
         b'\x69', b'\xc2', b'\xc3', b'\xca', b'\xcb', b'\xe7', b'\xa5', \
-        b'\xd1', b'\xf2']
+        b'\xd1', b'\xf2', b'\x8d']
     if instruction[0:1] not in known_starts :
         log.info("Found an unknown instruction.")
         result = format_unknown(instruction[0])
         return result
 
     #now run through each of the parsers to find assembly 
-    parsers = [parse_int3, parse_cpuid, parse_add, parse_and, parse_cmp, \
-         parse_dec, parse_idiv, parse_imul, parse_inc, parse_mov, parse_movsd, \
+    parsers = [parse_int3, parse_cpuid, parse_add, parse_and, \
+         parse_clflush, parse_cmp, parse_dec, parse_idiv, parse_imul, parse_inc,\
+         parse_lea, parse_mov, \
+         parse_movsd, \
          parse_mul, parse_neg, parse_nop, parse_not, parse_or, parse_out, \
          parse_pop, parse_push, parse_repne, parse_ret, parse_salsarshr, \
          parse_sbb, parse_sub, parse_test, parse_xor]
