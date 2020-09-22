@@ -125,7 +125,7 @@ labelbig:
 	
 	jmp dword eax
 	jmp dword [eax]
-	jmp dword [eax + 0x4]
+	jmp [byte eax + 0x4]
 	jmp dword [0x31323334]
 	jmp	dword [eax + 0x31323334]
 	
