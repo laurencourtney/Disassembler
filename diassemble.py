@@ -1,3 +1,13 @@
+'''
+Lauren Courtney - lcourtn5
+EN 695.744
+September 2020
+Programming Assignment 1
+
+Some code borrowed from diasm-example.py provided in class.
+
+'''
+
 import argparse
 import binascii
 import logging
